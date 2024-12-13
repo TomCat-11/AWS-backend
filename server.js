@@ -20,7 +20,7 @@ app.use(bodyParser.json());
 // Middleware to serve static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-const PORT = process.env.PORT || 7760; // Use PORT from .env or default to 7760
+const PORT = process.env.PORT || 443; // Use PORT from .env or default to 7760
 const MONGO_URI = process.env.MONGO_URI; // MongoDB connection string from .env
 
 // Connect to MongoDB
@@ -33,7 +33,7 @@ app.use(cors({
   origin: [
     // Replace with your EC2 public IP (frontend) or domain
     'https://sign-frontend.vercel.app',
-    'http://13.53.129.50:7760',  // Example frontend URL
+    'https://13.53.129.50:443',  // Example frontend URL
   ],
   methods: ['GET', 'POST', 'DELETE', 'PUT'],
 }));
