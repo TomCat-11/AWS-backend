@@ -1,3 +1,4 @@
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -6,111 +7,108 @@ const bcrypt = require("bcrypt");
 const nodemailer = require('nodemailer');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');  // To generate random OTPs
+const jwt = require("jsonwebtoken");
+const { Server } = require("socket.io");
+const { type } = require("os");
 const path = require('path');
 const multer = require('multer');
 
-// Load environment variables
 dotenv.config();
 
 const app = express();
 app.use(express.json());
-app.use(cors()); // Enable CORS
-app.use(bodyParser.json());
-
 // Middleware to serve static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(cors());
+app.use(bodyParser.json());
 
-const PORT = process.env.PORT || 443; // Use PORT from .env or default to 7760
-const MONGO_URI = process.env.MONGO_URI; // MongoDB connection string from .env
+const PORT = process.env.PORT || 7760;
+const MONGO_URI = process.env.MONGO_URI;
+
+
 
 // Connect to MongoDB
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+    .then(() => console.log("MongoDB connected"))
+    .catch((err) => console.error(err));
 
-// Enable Cross-Origin Resource Sharing (CORS)
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 app.use(cors({
-  origin: [
-    // Replace with your EC2 public IP (frontend) or domain
-    'https://sign-frontend.vercel.app',
-    'https://13.53.129.50:443',  // Example frontend URL
-  ],
+  origin: ['https://sign-frontend.vercel.app/', 'https://your-backend.onrender.com'],
   methods: ['GET', 'POST', 'DELETE', 'PUT'],
 }));
 
-// Set up multer for file uploads
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, 'uploads/'); // Upload folder
-    },
-    filename: (req, file, cb) => {
-      cb(null, Date.now() + path.extname(file.originalname));
-    }
-  }),
-  fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|gif|bmp|webp|tiff|svg|mp4|mov|avi|mkv|flv|wmv|webm|mpg|mpeg|3gp/;  // Allowed formats
-    const mimetype = filetypes.test(file.mimetype);
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
 
-    if (mimetype && extname) {
-      return cb(null, true);
-    }
-    cb(new Error('Invalid file type. Only images and videos are allowed.'));
-  }
-});
-
-// Serve static frontend (if necessary)
-app.use(express.static(path.join(__dirname, 'frontend/build')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend/build', 'index.html'));
-});
+    // To Store Uploads
+    const upload = multer({
+        storage: multer.diskStorage({
+            destination: (req, file, cb) => {
+                cb(null, 'uploads/');
+            },
+            filename: (req, file, cb) => {
+                cb(null, Date.now() + path.extname(file.originalname));
+            }
+        }),
+        fileFilter: (req, file, cb) => {
+            const filetypes = /jpeg|jpg|png|gif|bmp|webp|tiff|svg|mp4|mov|avi|mkv|flv|wmv|webm|mpg|mpeg|3gp/;  // All common image and video formats
+            const mimetype = filetypes.test(file.mimetype);
+            const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    
+            if (mimetype && extname) {
+                return cb(null, true);
+            }
+            cb(new Error('Invalid file type. Only images and videos are allowed.'));
+        }
+    });
 
 // User Schema
 const userSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  phoneNumber: { type: String }
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    email:{type:String,required:true,unique: true},
+    phoneNumber:{type:String}
 });
 
 const User = mongoose.model("User", userSchema);
 
+
 // Setup Nodemailer Transporter
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER, // Email from .env
-    pass: process.env.EMAIL_PASS, // Email password from .env
-  },
+    service: 'gmail', // You can change this to another email service (e.g., Outlook, Yahoo)
+    auth: {
+        user: process.env.EMAIL_USER, // Replace with your email
+        pass: process.env.EMAIL_PASS,   // Replace with your email password or app-specific password
+    },
 });
 
 // Route to send OTP
 app.post('/send-otp', (req, res) => {
-  const { email } = req.body;
-  if (!email) {
-    return res.status(400).send('Email is required');
-  }
-
-  const otp = crypto.randomInt(100000, 999999);
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: 'Your OTP Code',
-    text: `Your OTP code is ${otp}`,
-  };
-
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
-      console.error(error);
-      return res.status(500).send('Error sending OTP');
-    } else {
-      console.log('OTP sent: ' + info.response);
-      return res.status(200).send({ otp, message: 'OTP sent successfully' });
+    const { email } = req.body; // Get email from client
+    if (!email) {
+        return res.status(400).send('Email is required');
     }
-  });
-});
 
+    // Generate a random 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999);
+
+    // Send OTP via email
+    const mailOptions = {
+        from: 'cheluvaraj1011@gmail.com',  // Replace with your email
+        to: email,
+        subject: 'Your OTP Code',
+        text: `Your OTP code is ${otp}`,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+            console.log(error);
+            return res.status(500).send('Error sending OTP');
+        } else {
+            console.log('OTP sent: ' + info.response);
+            return res.status(200).send({ otp, message: 'OTP sent successfully' });  // Send OTP back to verify
+        }
+    });
+});
 
 app.post('/verify-otp', (req, res) => {
     const { enteredOtp, generatedOtp } = req.body;
@@ -296,8 +294,8 @@ app.delete('/items/:id', async (req, res) => {
       res.status(200).json({ status: "Success", message: "Item deleted successfully", data: deletedItem });
   } catch (error) {
       console.error("Error deleting item:", error);
-      res.status(500).json({ status: "Fail", message: "Server error" });
-  }
+      res.status(500).json({ status: "Fail", message: "Server error" });
+  }
 });
 
 app.put('/update-password', async (req, res) => {
@@ -321,16 +319,7 @@ app.put('/update-password', async (req, res) => {
 
     res.status(200).json({ message: 'Password updated successfully ✅' });
   } catch (error) {
-    res.status(500).json({ message: 'Error updating password.' });
-  }
-});
-
-// Start the server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
+    res.status(500).json({ message: 'Error updating password.' });
+  }
 });
   
-
-
-
-
