@@ -25,6 +25,15 @@ app.use(bodyParser.json());
 const PORT = process.env.PORT || 7760;
 const MONGO_URI = process.env.MONGO_URI;
 
+app.set('trust proxy', true);
+
+// Middleware to force HTTPS if necessary
+app.use((req, res, next) => {
+    if (req.protocol !== 'https' && req.get('X-Forwarded-Proto') === 'https') {
+        return res.redirect(301, 'https://' + req.hostname + req.url);
+    }
+    next();
+});
 
 
 // Connect to MongoDB
@@ -34,7 +43,7 @@ mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
 
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 app.use(cors({
-  origin: ['https://sign-frontend.vercel.app/', 'https://your-backend.onrender.com'],
+  origin: ['https://aws-frontend-amber.vercel.app/', 'https://13.53.129.50'],
   methods: ['GET', 'POST', 'DELETE', 'PUT'],
 }));
 
